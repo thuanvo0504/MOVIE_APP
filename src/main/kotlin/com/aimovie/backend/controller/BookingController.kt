@@ -21,15 +21,25 @@ class BookingController(
 ) {
 
     @GetMapping
-    fun getAllBookings(): ResponseEntity<List<Booking>> =
-        ResponseEntity.ok(bookingService.findAll())
+    fun getAllBookings(): ResponseEntity<List<Booking>> {
+        val userId = getAuthenticatedUserId()
+
+        return ResponseEntity.ok(
+            bookingService.findAll(userId)
+        )
+    }
 
     @GetMapping("/{bookingId}")
     fun getBookingById(
         @PathVariable bookingId: Long
     ): ResponseEntity<Booking> {
-        val booking = bookingService.findById(bookingId)
-            ?: return ResponseEntity.notFound().build()
+
+        val userId = getAuthenticatedUserId()
+
+        val booking = bookingService.findById(
+            bookingId,
+            userId
+        ) ?: return ResponseEntity.notFound().build()
 
         return ResponseEntity.ok(booking)
     }
@@ -38,8 +48,13 @@ class BookingController(
     fun getBookingByCode(
         @PathVariable bookingCode: String
     ): ResponseEntity<Booking> {
-        val booking = bookingService.findByBookingCode(bookingCode)
-            ?: return ResponseEntity.notFound().build()
+
+        val userId = getAuthenticatedUserId()
+
+        val booking = bookingService.findByBookingCode(
+            bookingCode,
+            userId
+        ) ?: return ResponseEntity.notFound().build()
 
         return ResponseEntity.ok(booking)
     }
@@ -49,16 +64,7 @@ class BookingController(
         @RequestBody request: BookingRequest
     ): ResponseEntity<Booking> {
 
-        val authentication =
-            SecurityContextHolder.getContext().authentication
-                ?: throw IllegalArgumentException(
-                    "Authentication is required"
-                )
-
-        val userId = authentication.name.toLongOrNull()
-            ?: throw IllegalArgumentException(
-                "Invalid authenticated user"
-            )
+        val userId = getAuthenticatedUserId()
 
         val booking = bookingService.createBooking(
             userId = userId,
@@ -71,26 +77,27 @@ class BookingController(
             .body(booking)
     }
 
-    @ExceptionHandler(IllegalStateException::class)
-    fun handleIllegalStateException(
-        exception: IllegalStateException
-    ): ResponseEntity<Map<String, String>> =
-        ResponseEntity
-            .status(HttpStatus.CONFLICT)
-            .body(
-                mapOf(
-                    "error" to (
-                        exception.message
-                            ?: "Booking conflict"
-                        )
+    private fun getAuthenticatedUserId(): Long {
+        val authentication =
+            SecurityContextHolder
+                .getContext()
+                .authentication
+                ?: throw IllegalArgumentException(
+                    "Authentication is required"
                 )
+
+        return authentication.name.toLongOrNull()
+            ?: throw IllegalArgumentException(
+                "Invalid authenticated user"
             )
+    }
 
     @ExceptionHandler(IllegalArgumentException::class)
     fun handleIllegalArgumentException(
         exception: IllegalArgumentException
-    ): ResponseEntity<Map<String, String>> =
-        ResponseEntity
+    ): ResponseEntity<Map<String, String>> {
+
+        return ResponseEntity
             .status(HttpStatus.BAD_REQUEST)
             .body(
                 mapOf(
@@ -100,4 +107,22 @@ class BookingController(
                         )
                 )
             )
+    }
+
+    @ExceptionHandler(IllegalStateException::class)
+    fun handleIllegalStateException(
+        exception: IllegalStateException
+    ): ResponseEntity<Map<String, String>> {
+
+        return ResponseEntity
+            .status(HttpStatus.CONFLICT)
+            .body(
+                mapOf(
+                    "error" to (
+                        exception.message
+                            ?: "Booking conflict"
+                        )
+                )
+            )
+    }
 }

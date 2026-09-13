@@ -21,37 +21,73 @@ class PaymentController(
 ) {
 
     @GetMapping
-    fun getAllPayments(): ResponseEntity<List<Payment>> =
-        ResponseEntity.ok(paymentService.findAll())
+    fun getAllPayments(
+        authentication: Authentication
+    ): ResponseEntity<List<Payment>> {
+
+        val userId = authentication.name.toLongOrNull()
+            ?: throw IllegalArgumentException(
+                "Invalid authenticated user"
+            )
+
+        return ResponseEntity.ok(
+            paymentService.findAllForUser(userId)
+        )
+    }
 
     @GetMapping("/{paymentId}")
     fun getPaymentById(
-        @PathVariable paymentId: Long
+        @PathVariable paymentId: Long,
+        authentication: Authentication
     ): ResponseEntity<Payment> {
 
-        val payment = paymentService.findById(paymentId)
-            ?: return ResponseEntity.notFound().build()
+        val userId = authentication.name.toLongOrNull()
+            ?: throw IllegalArgumentException(
+                "Invalid authenticated user"
+            )
+
+        val payment = paymentService.findByIdForUser(
+            paymentId = paymentId,
+            userId = userId
+        ) ?: return ResponseEntity.notFound().build()
 
         return ResponseEntity.ok(payment)
     }
 
     @GetMapping("/booking/{bookingId}")
     fun getPaymentsByBookingId(
-        @PathVariable bookingId: Long
+        @PathVariable bookingId: Long,
+        authentication: Authentication
     ): ResponseEntity<List<Payment>> {
 
+        val userId = authentication.name.toLongOrNull()
+            ?: throw IllegalArgumentException(
+                "Invalid authenticated user"
+            )
+
         return ResponseEntity.ok(
-            paymentService.findByBookingId(bookingId)
+            paymentService.findByBookingIdForUser(
+                bookingId = bookingId,
+                userId = userId
+            )
         )
     }
 
     @GetMapping("/transaction/{transactionCode}")
     fun getPaymentByTransactionCode(
-        @PathVariable transactionCode: String
+        @PathVariable transactionCode: String,
+        authentication: Authentication
     ): ResponseEntity<Payment> {
 
-        val payment = paymentService.findByTransactionCode(transactionCode)
-            ?: return ResponseEntity.notFound().build()
+        val userId = authentication.name.toLongOrNull()
+            ?: throw IllegalArgumentException(
+                "Invalid authenticated user"
+            )
+
+        val payment = paymentService.findByTransactionCodeForUser(
+            transactionCode = transactionCode,
+            userId = userId
+        ) ?: return ResponseEntity.notFound().build()
 
         return ResponseEntity.ok(payment)
     }
@@ -62,8 +98,14 @@ class PaymentController(
         authentication: Authentication
     ): ResponseEntity<Payment> {
 
+        val userId = authentication.name.toLongOrNull()
+            ?: throw IllegalArgumentException(
+                "Invalid authenticated user"
+            )
+
         val payment = paymentService.createPayment(
             bookingId = request.bookingId,
+            userId = userId,
             amount = request.amount,
             paymentMethod = request.paymentMethod
         )

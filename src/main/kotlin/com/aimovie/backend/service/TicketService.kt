@@ -18,33 +18,125 @@ class TicketService(
     private val paymentRepository: PaymentRepository
 ) {
 
-    fun findAll(): List<Ticket> {
+    // ============================================================
+    // DATA-LEVEL AUTHORIZATION
+    // ============================================================
+
+    fun findAllForUser(userId: Long): List<Ticket> {
         return ticketRepository.findAll()
+            .filter { ticket ->
+                val booking = bookingRepository
+                    .findById(ticket.bookingId)
+                    .orElse(null)
+
+                booking?.userId == userId
+            }
     }
 
-    fun findById(ticketId: Long): Ticket? {
-        return ticketRepository.findById(ticketId).orElse(null)
+    fun findByIdForUser(
+        ticketId: Long,
+        userId: Long
+    ): Ticket? {
+
+        val ticket = ticketRepository.findById(ticketId)
+            .orElse(null)
+            ?: return null
+
+        val booking = bookingRepository
+            .findById(ticket.bookingId)
+            .orElse(null)
+            ?: return null
+
+        return if (booking.userId == userId) {
+            ticket
+        } else {
+            null
+        }
     }
 
-    fun findByBookingId(bookingId: Long): List<Ticket> {
+    fun findByBookingIdForUser(
+        bookingId: Long,
+        userId: Long
+    ): List<Ticket> {
+
+        val booking = bookingRepository
+            .findById(bookingId)
+            .orElse(null)
+            ?: return emptyList()
+
+        if (booking.userId != userId) {
+            return emptyList()
+        }
+
         return ticketRepository.findByBookingId(bookingId)
     }
 
-    fun findByBookingSeatId(bookingSeatId: Long): Ticket? {
+    fun findByBookingSeatIdForUser(
+        bookingSeatId: Long,
+        userId: Long
+    ): Ticket? {
+
+        val bookingSeat = bookingSeatRepository
+            .findById(bookingSeatId)
+            .orElse(null)
+            ?: return null
+
+        val booking = bookingRepository
+            .findById(bookingSeat.bookingId)
+            .orElse(null)
+            ?: return null
+
+        if (booking.userId != userId) {
+            return null
+        }
+
         return ticketRepository.findByBookingSeatId(bookingSeatId)
     }
 
-    fun findByQrCode(qrCode: String): Ticket? {
-        return ticketRepository.findByQrCode(qrCode)
+    fun findByQrCodeForUser(
+        qrCode: String,
+        userId: Long
+    ): Ticket? {
+
+        val ticket = ticketRepository
+            .findByQrCode(qrCode)
+            ?: return null
+
+        val booking = bookingRepository
+            .findById(ticket.bookingId)
+            .orElse(null)
+            ?: return null
+
+        return if (booking.userId == userId) {
+            ticket
+        } else {
+            null
+        }
     }
 
+    // ============================================================
+    // CREATE TICKETS
+    // ============================================================
+
     @Transactional
-    fun createTicketsForBooking(bookingId: Long): List<Ticket> {
+    fun createTicketsForBooking(
+        bookingId: Long,
+        userId: Long
+    ): List<Ticket> {
 
         val booking = bookingRepository.findById(bookingId)
             .orElseThrow {
-                IllegalArgumentException("Booking not found: $bookingId")
+                IllegalArgumentException(
+                    "Booking not found: $bookingId"
+                )
             }
+
+        // DATA-LEVEL AUTHORIZATION
+        if (booking.userId != userId) {
+            throw IllegalStateException(
+                "You are not allowed to access this booking"
+            )
+        }
 
         if (booking.status != "CONFIRMED") {
             throw IllegalStateException(
